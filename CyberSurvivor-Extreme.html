@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CYBER SURVIVOR EXTREME</title>
+<style>
+html,body{margin:0;background:#000;overflow:hidden;font-family:sans-serif}
+canvas{display:block}
+#ui{position:fixed;left:10px;top:10px;color:#fff;font-weight:bold}
+#title{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;background:#000}
+button{font-size:24px;padding:12px 24px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="ui"></div>
+<div id="title"><h1>CYBER SURVIVOR EXTREME</h1><p>HTML ONE FILE</p><button onclick="startGame()">START</button></div>
+<script>
+const cv=c,ctx=cv.getContext('2d');
+function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();onresize=rs;
+let game=false,time=0,wave=1;
+const ui=document.getElementById('ui');
+const p={x:0,y:0,hp:200,maxHp:200,lv:1,xp:0,next:50,speed:4};
+const keys={};
+onkeydown=e=>keys[e.key]=1; onkeyup=e=>keys[e.key]=0;
+
+const bullets=[],enemies=[],effects=[],gems=[];
+let fireRate=12,multiShot=1,bulletDmg=10;
+
+function startGame(){game=true;title.style.display='none';}
+
+function spawnWave(){
+ let count=20+wave*8;
+ for(let i=0;i<count;i++){
+   let a=Math.random()*Math.PI*2;
+   let r=1000+Math.random()*1000;
+   enemies.push({
+     x:p.x+Math.cos(a)*r,
+     y:p.y+Math.sin(a)*r,
+     hp:20+wave*4,
+     sp:0.5+Math.random()*1.5,
+     size:10+Math.random()*15
+   });
+ }
+}
+spawnWave();
+
+function shoot(){
+ let near=null,d=1e12;
+ for(const e of enemies){
+  let dd=(e.x-p.x)**2+(e.y-p.y)**2;
+  if(dd<d){d=dd;near=e;}
+ }
+ if(!near)return;
+ let base=Math.atan2(near.y-p.y,near.x-p.x);
+ for(let i=0;i<multiShot;i++){
+   let ang=base+(i-(multiShot-1)/2)*0.15;
+   bullets.push({x:p.x,y:p.y,vx:Math.cos(ang)*12,vy:Math.sin(ang)*12,life:120});
+ }
+}
+
+function levelUp(){
+ p.lv++;
+ p.xp=0;
+ p.next=Math.floor(p.next*1.35);
+ let r=Math.floor(Math.random()*3);
+ if(r===0)bulletDmg+=5;
+ if(r===1)multiShot=Math.min(7,multiShot+1);
+ if(r===2)fireRate=Math.max(3,fireRate-1);
+}
+
+let frame=0;
+
+function loop(){
+ requestAnimationFrame(loop);
+ ctx.fillStyle="#050816";
+ ctx.fillRect(0,0,cv.width,cv.height);
+
+ if(!game)return;
+
+ frame++;
+ time+=1/60;
+
+ if(keys.a||keys.ArrowLeft)p.x-=p.speed;
+ if(keys.d||keys.ArrowRight)p.x+=p.speed;
+ if(keys.w||keys.ArrowUp)p.y-=p.speed;
+ if(keys.s||keys.ArrowDown)p.y+=p.speed;
+
+ if(frame%fireRate===0)shoot();
+
+ if(time>wave*20){
+   wave++;
+   spawnWave();
+ }
+
+ for(let i=bullets.length-1;i>=0;i--){
+   let b=bullets[i];
+   b.x+=b.vx;b.y+=b.vy;b.life--;
+   if(b.life<=0)bullets.splice(i,1);
+ }
+
+ for(let i=enemies.length-1;i>=0;i--){
+   let e=enemies[i];
+   let a=Math.atan2(p.y-e.y,p.x-e.x);
+   e.x+=Math.cos(a)*e.sp;
+   e.y+=Math.sin(a)*e.sp;
+
+   for(let j=bullets.length-1;j>=0;j--){
+     let b=bullets[j];
+     let dx=e.x-b.x,dy=e.y-b.y;
+     if(dx*dx+dy*dy<e.size*e.size){
+       e.hp-=bulletDmg;
+       bullets.splice(j,1);
+       if(e.hp<=0){
+         gems.push({x:e.x,y:e.y});
+         for(let k=0;k<15;k++){
+           effects.push({x:e.x,y:e.y,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,l:40});
+         }
+         enemies.splice(i,1);
+       }
+       break;
+     }
+   }
+
+   let dx=e.x-p.x,dy=e.y-p.y;
+   if(dx*dx+dy*dy<(e.size+18)*(e.size+18)) p.hp-=0.15;
+ }
+
+ for(let i=gems.length-1;i>=0;i--){
+   let g=gems[i];
+   let dx=p.x-g.x,dy=p.y-g.y;
+   let d=Math.hypot(dx,dy);
+   if(d<150){
+      g.x+=dx*0.08;
+      g.y+=dy*0.08;
+   }
+   if(d<20){
+      p.xp+=10;
+      gems.splice(i,1);
+      if(p.xp>=p.next) levelUp();
+   }
+ }
+
+ for(let i=effects.length-1;i>=0;i--){
+   let e=effects[i];
+   e.x+=e.vx;e.y+=e.vy;e.l--;
+   if(e.l<=0)effects.splice(i,1);
+ }
+
+ let camx=cv.width/2-p.x;
+ let camy=cv.height/2-p.y;
+
+ for(let s=0;s<400;s++){
+   ctx.fillStyle="white";
+   let x=((s*137)-p.x*0.05)%5000;
+   let y=((s*71)-p.y*0.05)%5000;
+   ctx.fillRect((x+5000)%5000,(y+5000)%5000,2,2);
+ }
+
+ ctx.save();
+ ctx.translate(camx,camy);
+
+ ctx.fillStyle="#0ff";
+ ctx.beginPath();ctx.arc(p.x,p.y,18,0,6.28);ctx.fill();
+
+ ctx.fillStyle="#ff0";
+ for(const g of gems){ctx.beginPath();ctx.arc(g.x,g.y,5,0,6.28);ctx.fill();}
+
+ ctx.fillStyle="#f44";
+ for(const e of enemies){ctx.beginPath();ctx.arc(e.x,e.y,e.size,0,6.28);ctx.fill();}
+
+ ctx.fillStyle="#fff";
+ for(const b of bullets){ctx.fillRect(b.x-2,b.y-2,4,4);}
+
+ for(const e of effects){ctx.fillRect(e.x,e.y,3,3);}
+
+ ctx.restore();
+
+ ui.innerHTML=
+ "LV:"+p.lv+
+ " HP:"+Math.floor(p.hp)+"/"+p.maxHp+
+ " XP:"+p.xp+"/"+p.next+
+ " Wave:"+wave+
+ " Enemies:"+enemies.length+
+ " Bullets:"+bullets.length;
+
+ if(p.hp<=0){
+   game=false;
+   title.style.display='flex';
+   title.innerHTML='<h1>GAME OVER</h1><h2>LV '+p.lv+'</h2><button onclick="location.reload()">RETRY</button>';
+ }
+}
+loop();
+</script></body></html>
