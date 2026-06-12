@@ -8,22 +8,199 @@
 <style>
 body{
     margin:0;
-    background:#111;
-    color:white;
-    font-family:sans-serif;
-    display:flex;
-    justify-content:center;
-    align-items:center;
+    overflow:hidden;
+    background:#000;
+    touch-action:none;
+}
+
+canvas{
+    display:block;
+    width:100vw;
     height:100vh;
 }
 
-h1{
-    font-size:48px;
+#ui{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
 }
+
+.btn{
+    position:absolute;
+    width:80px;
+    height:80px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.2);
+    border:2px solid white;
+    pointer-events:auto;
+    touch-action:none;
+}
+
+#left{left:20px;bottom:20px;}
+#right{left:120px;bottom:20px;}
+#jump{right:20px;bottom:20px;}
 </style>
 </head>
 
 <body>
-<h1>Cyber Runner</h1>
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+    <div class="btn" id="left"></div>
+    <div class="btn" id="right"></div>
+    <div class="btn" id="jump"></div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+const keys = {};
+
+function bindButton(id,key){
+    const b=document.getElementById(id);
+
+    b.addEventListener("touchstart",e=>{
+        e.preventDefault();
+        keys[key]=true;
+    });
+
+    b.addEventListener("touchend",e=>{
+        e.preventDefault();
+        keys[key]=false;
+    });
+}
+
+bindButton("left","ArrowLeft");
+bindButton("right","ArrowRight");
+bindButton("jump","Space");
+
+addEventListener("keydown",e=>{
+    keys[e.code]=true;
+});
+
+addEventListener("keyup",e=>{
+    keys[e.code]=false;
+});
+
+const player={
+    x:100,
+    y:200,
+    vx:0,
+    vy:0,
+    w:40,
+    h:40,
+    jumps:0
+};
+
+let cameraX=0;
+
+const gravity=0.7;
+const speed=5;
+const jumpPower=-14;
+
+const groundY=400;
+
+function update(){
+
+    if(keys["ArrowLeft"]){
+        player.vx=-speed;
+    }
+    else if(keys["ArrowRight"]){
+        player.vx=speed;
+    }
+    else{
+        player.vx=0;
+    }
+
+    player.x+=player.vx;
+
+    player.vy+=gravity;
+    player.y+=player.vy;
+
+    if(player.y+player.h>groundY){
+        player.y=groundY-player.h;
+        player.vy=0;
+        player.jumps=0;
+    }
+
+    cameraX=player.x-150;
+}
+
+function draw(){
+
+    ctx.fillStyle="#001";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // 背景星
+    ctx.fillStyle="white";
+    for(let i=0;i<100;i++){
+        ctx.fillRect(
+            (i*200-cameraX*0.2)%4000,
+            (i*37)%canvas.height,
+            2,2
+        );
+    }
+
+    ctx.save();
+    ctx.translate(-cameraX,0);
+
+    // 地面
+    ctx.fillStyle="#0a0";
+    ctx.fillRect(-1000,groundY,10000,200);
+
+    // プレイヤー
+    ctx.fillStyle="#0ff";
+    ctx.fillRect(
+        player.x,
+        player.y,
+        player.w,
+        player.h
+    );
+
+    ctx.restore();
+
+    ctx.fillStyle="white";
+    ctx.font="24px sans-serif";
+    ctx.fillText(
+        "X:"+Math.floor(player.x),
+        20,40
+    );
+}
+
+function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+addEventListener("keydown",e=>{
+    if(e.code==="Space" && player.jumps<2){
+        player.vy=jumpPower;
+        player.jumps++;
+    }
+});
+
+document.getElementById("jump")
+.addEventListener("touchstart",e=>{
+    e.preventDefault();
+
+    if(player.jumps<2){
+        player.vy=jumpPower;
+        player.jumps++;
+    }
+});
+
+loop();
+</script>
+
 </body>
 </html>
