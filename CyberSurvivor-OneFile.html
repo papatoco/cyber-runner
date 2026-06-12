@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CYBER SURVIVOR - One File Edition</title>
+<style>
+html,body{margin:0;background:#000;overflow:hidden;font-family:sans-serif;color:#fff}
+canvas{display:block;width:100vw;height:100vh}
+#hud{position:fixed;left:10px;top:10px;font-weight:bold}
+#msg{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
+button{font-size:20px;padding:12px 24px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="msg">
+<h1>CYBER SURVIVOR</h1>
+<p>index.html only</p>
+<button id="start">START</button>
+</div>
+<script>
+const cv=c,ctx=cv.getContext('2d');
+function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();onresize=rs;
+
+let running=false,t=0,lv=1,xp=0,nextXp=20,kills=0;
+const p={x:0,y:0,hp:100,maxHp:100,speed:4};
+const bullets=[],enemies=[],parts=[];
+const keys={};
+onkeydown=e=>keys[e.key]=1;
+onkeyup=e=>keys[e.key]=0;
+
+function snd(f,d=.05){
+ try{
+ let a=new(window.AudioContext||window.webkitAudioContext)();
+ let o=a.createOscillator(),g=a.createGain();
+ o.frequency.value=f;o.connect(g);g.connect(a.destination);
+ g.gain.value=.03;o.start();
+ g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+d);
+ o.stop(a.currentTime+d);
+ }catch(e){}
+}
+
+document.getElementById("start").onclick=()=>{
+ running=true;
+ document.getElementById("msg").style.display="none";
+};
+
+function spawnEnemy(){
+ let a=Math.random()*Math.PI*2;
+ let r=Math.max(cv.width,cv.height)*0.8;
+ enemies.push({
+ x:p.x+Math.cos(a)*r,
+ y:p.y+Math.sin(a)*r,
+ hp:10+lv*2,
+ sp:1+Math.random()*1.5
+ });
+}
+
+setInterval(()=>{if(running)for(let i=0;i<1+Math.floor(t/20);i++)spawnEnemy()},700);
+
+setInterval(()=>{
+ if(!running)return;
+ let near=null,d=999999;
+ for(const e of enemies){
+   let dd=(e.x-p.x)**2+(e.y-p.y)**2;
+   if(dd<d){d=dd;near=e;}
+ }
+ if(near){
+   let ang=Math.atan2(near.y-p.y,near.x-p.x);
+   bullets.push({x:p.x,y:p.y,vx:Math.cos(ang)*10,vy:Math.sin(ang)*10,dmg:8+lv});
+   snd(700,.02);
+ }
+},180);
+
+function levelup(){
+ lv++;
+ xp=0;
+ nextXp=Math.floor(nextXp*1.4);
+ p.maxHp+=10;
+ p.hp=Math.min(p.maxHp,p.hp+20);
+ p.speed+=0.2;
+}
+
+function loop(){
+ requestAnimationFrame(loop);
+ if(!running){
+   ctx.fillStyle="#000";ctx.fillRect(0,0,cv.width,cv.height);
+   return;
+ }
+ t+=1/60;
+
+ if(keys["ArrowLeft"]||keys["a"])p.x-=p.speed;
+ if(keys["ArrowRight"]||keys["d"])p.x+=p.speed;
+ if(keys["ArrowUp"]||keys["w"])p.y-=p.speed;
+ if(keys["ArrowDown"]||keys["s"])p.y+=p.speed;
+
+ for(let i=bullets.length-1;i>=0;i--){
+   let b=bullets[i];
+   b.x+=b.vx;b.y+=b.vy;
+   if(Math.abs(b.x-p.x)>2000||Math.abs(b.y-p.y)>2000)bullets.splice(i,1);
+ }
+
+ for(let i=enemies.length-1;i>=0;i--){
+   let e=enemies[i];
+   let a=Math.atan2(p.y-e.y,p.x-e.x);
+   e.x+=Math.cos(a)*e.sp;
+   e.y+=Math.sin(a)*e.sp;
+
+   for(let j=bullets.length-1;j>=0;j--){
+     let b=bullets[j];
+     let dx=e.x-b.x,dy=e.y-b.y;
+     if(dx*dx+dy*dy<400){
+       e.hp-=b.dmg;
+       bullets.splice(j,1);
+       if(e.hp<=0){
+         enemies.splice(i,1);
+         kills++;
+         xp+=5;
+         for(let k=0;k<8;k++){
+           parts.push({x:e.x,y:e.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,l:30});
+         }
+         snd(180,.04);
+         if(xp>=nextXp)levelup();
+       }
+       break;
+     }
+   }
+
+   let dx=e.x-p.x,dy=e.y-p.y;
+   if(dx*dx+dy*dy<900){
+      p.hp-=0.08;
+   }
+ }
+
+ for(let i=parts.length-1;i>=0;i--){
+   let p2=parts[i];
+   p2.x+=p2.vx;p2.y+=p2.vy;p2.l--;
+   if(p2.l<=0)parts.splice(i,1);
+ }
+
+ ctx.fillStyle="#050510";
+ ctx.fillRect(0,0,cv.width,cv.height);
+
+ for(let s=0;s<200;s++){
+   ctx.fillStyle="white";
+   let sx=((s*137)-p.x*0.1)%4000;
+   let sy=((s*71)-p.y*0.1)%3000;
+   ctx.fillRect((sx+4000)%4000,(sy+3000)%3000,2,2);
+ }
+
+ ctx.save();
+ ctx.translate(cv.width/2-p.x,cv.height/2-p.y);
+
+ ctx.fillStyle="#0ff";
+ ctx.beginPath();
+ ctx.arc(p.x,p.y,18,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="#ff0";
+ for(const b of bullets){
+   ctx.beginPath();
+   ctx.arc(b.x,b.y,4,0,Math.PI*2);
+   ctx.fill();
+ }
+
+ ctx.fillStyle="#f44";
+ for(const e of enemies){
+   ctx.beginPath();
+   ctx.arc(e.x,e.y,14,0,Math.PI*2);
+   ctx.fill();
+ }
+
+ ctx.fillStyle="#fff";
+ for(const pp of parts){
+   ctx.fillRect(pp.x,pp.y,3,3);
+ }
+
+ ctx.restore();
+
+ hud.innerHTML=
+   "LV:"+lv+
+   " HP:"+Math.floor(p.hp)+"/"+p.maxHp+
+   " XP:"+xp+"/"+nextXp+
+   " KILLS:"+kills+
+   " ENEMIES:"+enemies.length;
+
+ if(p.hp<=0){
+   running=false;
+   msg.style.display="block";
+   msg.innerHTML="<h1>GAME OVER</h1><p>Kills:"+kills+"</p><button onclick='location.reload()'>RETRY</button>";
+ }
+}
+loop();
+</script>
+</body>
+</html>
